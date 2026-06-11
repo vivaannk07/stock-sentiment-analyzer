@@ -66,10 +66,23 @@ if analyze_btn or "last_ticker" in st.session_state:
     active_days_back = st.session_state.get("last_days_back", days_back)
 
     # ── Data loading ─────────────────────────────────────────────────────────
+    # Cached wrappers — avoid repeated API calls
+    @st.cache_data(ttl=3600, show_spinner=False)
+    def cached_price(ticker, period):
+        return fetch_price_history(ticker, period=period)
+    
+    @st.cache_data(ttl=3600, show_spinner=False)
+    def cached_news(ticker, days_back):
+        return fetch_news_headlines(ticker, days_back=days_back)
+    
+    @st.cache_data(ttl=3600, show_spinner=False)
+    def cached_info(ticker):
+        return get_ticker_info(ticker)
+    
     with st.spinner(f"Fetching data for {active_ticker}…"):
-        price_df = fetch_price_history(active_ticker, period=active_period)
-        articles = fetch_news_headlines(active_ticker, days_back=active_days_back)
-        info = get_ticker_info(active_ticker)
+        price_df = cached_price(active_ticker, active_period)
+        articles = cached_news(active_ticker, active_days_back)
+        info = cached_info(active_ticker)
 
     scored_df = score_articles(articles)
     daily_df = daily_sentiment(scored_df)

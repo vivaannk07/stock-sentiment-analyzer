@@ -36,11 +36,32 @@ NEWS_API_URL = "https://newsapi.org/v2/everything"
 
 
 def fetch_price_history(ticker: str, period: str = "3mo") -> pd.DataFrame:
-    """Return OHLCV DataFrame for the given ticker and period."""
-    stock = yf.Ticker(ticker)
-    df = stock.history(period=period)
-    df.index = pd.to_datetime(df.index).tz_localize(None)
-    return df
+    """Return OHLCV DataFrame for the given ticker and period. Retries on rate limits."""
+    import time
+    
+    for attempt in range(3):
+        try:
+            stock = yf.Ticker(ticker)
+            df = stock.history(period=period)
+            
+            if df.empty:
+                # Empty response — retry once after a short wait
+                if attempt < 2:
+                    time.sleep(2)
+                    continue
+                return df
+            
+            df.index = pd.to_datetime(df.index).tz_localize(None)
+            return df
+        except Exception as e:
+            if attempt < 2:
+                time.sleep(3 * (attempt + 1))  # Wait 3s, then 6s
+                continue
+            # Final attempt failed — return empty DataFrame instead of crashing
+            print(f"Failed to fetch {ticker}: {e}")
+            return pd.DataFrame()
+    
+    return pd.DataFrame()
 
 
 def fetch_news_headlines(ticker: str, days_back: int = 30) -> list[dict]:
@@ -89,16 +110,31 @@ def fetch_news_headlines(ticker: str, days_back: int = 30) -> list[dict]:
 
 
 def get_ticker_info(ticker: str) -> dict:
-    """Return basic company info for display."""
-    try:
-        info = yf.Ticker(ticker).info
-        return {
-            "name": info.get("longName", ticker),
-            "sector": info.get("sector", "N/A"),
-            "industry": info.get("industry", "N/A"),
-            "market_cap": info.get("marketCap"),
-            "current_price": info.get("currentPrice") or info.get("regularMarketPrice"),
-        }
-    except Exception:
-        return {"name": ticker, "sector": "N/A", "industry": "N/A",
-                "market_cap": None, "current_price": None}
+    """Return basic company info for display. Falls back to ticker name on failure."""
+    import time
+    
+    company_name_fallback = get_company_name(ticker)
+    
+    for attempt in range(2):
+        try:
+            info = yf.Ticker(ticker).info
+            return {
+                "name": info.get("longName", company_name_fallback),
+                "sector": info.get("sector", "N/A"),
+                "industry": info.get("industry", "N/A"),
+                "market_cap": info.get("marketCap"),
+                "current_price": info.get("currentPrice") or info.get("regularMarketPrice"),
+            }
+        except Exception:
+            if attempt < 1:
+                time.sleep(2)
+                continue
+    
+    # Fallback: use the company name from CSV, no price/sector
+    return {
+        "name": company_name_fallback,
+        "sector": "N/A",
+        "industry": "N/A",
+        "market_cap": None,
+        "current_price": None,
+    }
