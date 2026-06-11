@@ -76,13 +76,13 @@ if analyze_btn or "last_ticker" in st.session_state:
         return fetch_news_headlines(ticker, days_back=days_back)
     
     @st.cache_data(ttl=3600, show_spinner=False)
-    def cached_info(ticker):
-        return get_ticker_info(ticker)
+    def cached_info(ticker, _price_df):
+        return get_ticker_info(ticker, price_df=_price_df)
     
     with st.spinner(f"Fetching data for {active_ticker}…"):
         price_df = cached_price(active_ticker, active_period)
         articles = cached_news(active_ticker, active_days_back)
-        info = cached_info(active_ticker)
+        info = cached_info(active_ticker, price_df)
 
     scored_df = score_articles(articles)
     daily_df = daily_sentiment(scored_df)
@@ -124,7 +124,12 @@ if analyze_btn or "last_ticker" in st.session_state:
 
     # ── Charts ────────────────────────────────────────────────────────────────
     if price_df.empty:
-        st.error(f"Could not fetch price data for **{active_ticker}**. Check the ticker symbol.")
+        st.error(
+            f"⚠️ Could not fetch price data for **{active_ticker}** right now. "
+            "Yahoo Finance may be temporarily rate-limiting requests. "
+            "Please wait 30 seconds and click Analyze again."
+        )
+        st.info("💡 Tip: Try selecting a different stock — sometimes only certain tickers are blocked.")
     else:
         st.plotly_chart(
             price_sentiment_chart(price_df, daily_df, active_ticker),

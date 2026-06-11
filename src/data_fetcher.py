@@ -109,32 +109,46 @@ def fetch_news_headlines(ticker: str, days_back: int = 30) -> list[dict]:
         return []
 
 
-def get_ticker_info(ticker: str) -> dict:
-    """Return basic company info for display. Falls back to ticker name on failure."""
-    import time
+def get_ticker_info(ticker: str, price_df: pd.DataFrame = None) -> dict:
+    """
+    Return basic company info for display.
+    Uses CSV lookup for name + sector, history data for current price.
+    Falls back to yf.info only as a last resort.
+    """
+    # Get company name + sector from CSV (instant, no API call)
+    company_name = get_company_name(ticker)
     
-    company_name_fallback = get_company_name(ticker)
+    sector = "N/A"
+    try:
+        df = pd.read_csv(_NIFTY50_CSV)
+        match = df[df["ticker"] == ticker]
+        if not match.empty:
+            sector = match.iloc[0]["sector"]
+    except Exception:
+        pass
     
-    for attempt in range(2):
-        try:
-            info = yf.Ticker(ticker).info
-            return {
-                "name": info.get("longName", company_name_fallback),
-                "sector": info.get("sector", "N/A"),
-                "industry": info.get("industry", "N/A"),
-                "market_cap": info.get("marketCap"),
-                "current_price": info.get("currentPrice") or info.get("regularMarketPrice"),
-            }
-        except Exception:
-            if attempt < 1:
-                time.sleep(2)
-                continue
+    # Get current price from the price_df we already fetched (no extra API call!)
+    current_price = None
+    if price_df is not None and not price_df.empty:
+        current_price = float(price_df["Close"].iloc[-1])
     
-    # Fallback: use the company name from CSV, no price/sector
+    # Try yf.info ONLY for industry (optional enrichment)
+    industry = "N/A"
+    market_cap = None
+    try:
+        info = yf.Ticker(ticker).info
+        industry = info.get("industry", "N/A")
+        market_cap = info.get("marketCap")
+        # If we still don't have current price, try info as backup
+        if current_price is None:
+            current_price = info.get("currentPrice") or info.get("regularMarketPrice")
+    except Exception:
+        pass  # Fail silently — we already have the essential data
+    
     return {
-        "name": company_name_fallback,
-        "sector": "N/A",
-        "industry": "N/A",
-        "market_cap": None,
-        "current_price": None,
+        "name": company_name,
+        "sector": sector,
+        "industry": industry,
+        "market_cap": market_cap,
+        "current_price": current_price,
     }
