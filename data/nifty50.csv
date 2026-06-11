@@ -1,0 +1,51 @@
+ticker,company_name,sector
+RELIANCE.NS,Reliance Industries,Energy
+TCS.NS,Tata Consultancy Services,IT
+HDFCBANK.NS,HDFC Bank,Banking
+INFY.NS,Infosys,IT
+ICICIBANK.NS,ICICI Bank,Banking
+HINDUNILVR.NS,Hindustan Unilever,FMCG
+ITC.NS,ITC Limited,FMCG
+SBIN.NS,State Bank of India,Banking
+BHARTIARTL.NS,Bharti Airtel,Telecom
+BAJFINANCE.NS,Bajaj Finance,Financial Services
+KOTAKBANK.NS,Kotak Mahindra Bank,Banking
+LT.NS,Larsen and Toubro,Construction
+AXISBANK.NS,Axis Bank,Banking
+ASIANPAINT.NS,Asian Paints,Consumer
+MARUTI.NS,Maruti Suzuki,Auto
+HCLTECH.NS,HCL Technologies,IT
+SUNPHARMA.NS,Sun Pharmaceutical,Pharma
+TITAN.NS,Titan Company,Consumer
+ULTRACEMCO.NS,UltraTech Cement,Cement
+WIPRO.NS,Wipro,IT
+NESTLEIND.NS,Nestle India,FMCG
+NTPC.NS,NTPC,Power
+POWERGRID.NS,Power Grid Corporation,Power
+M&M.NS,Mahindra and Mahindra,Auto
+TATAMOTORS.NS,Tata Motors,Auto
+TATASTEEL.NS,Tata Steel,Metals
+INDUSINDBK.NS,IndusInd Bank,Banking
+ONGC.NS,Oil and Natural Gas Corporation,Energy
+ADANIENT.NS,Adani Enterprises,Conglomerate
+JSWSTEEL.NS,JSW Steel,Metals
+COALINDIA.NS,Coal India,Energy
+BAJAJFINSV.NS,Bajaj Finserv,Financial Services
+HINDALCO.NS,Hindalco Industries,Metals
+GRASIM.NS,Grasim Industries,Cement
+DRREDDY.NS,Dr Reddys Laboratories,Pharma
+CIPLA.NS,Cipla,Pharma
+BRITANNIA.NS,Britannia Industries,FMCG
+EICHERMOT.NS,Eicher Motors,Auto
+DIVISLAB.NS,Divis Laboratories,Pharma
+APOLLOHOSP.NS,Apollo Hospitals,Healthcare
+BAJAJ-AUTO.NS,Bajaj Auto,Auto
+HEROMOTOCO.NS,Hero MotoCorp,Auto
+BPCL.NS,Bharat Petroleum,Energy
+TATACONSUM.NS,Tata Consumer Products,FMCG
+TECHM.NS,Tech Mahindra,IT
+ADANIPORTS.NS,Adani Ports and SEZ,Infrastructure
+LTIM.NS,LTIMindtree,IT
+SBILIFE.NS,SBI Life Insurance,Insurance
+HDFCLIFE.NS,HDFC Life Insurance,Insurance
+UPL.NS,UPL Limited,Chemicals
