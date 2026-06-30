@@ -2,7 +2,7 @@ import os
 import requests
 import pandas as pd
 import yfinance as yf
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from dotenv import load_dotenv
 from pathlib import Path
 
@@ -33,6 +33,10 @@ def get_nifty50_list() -> pd.DataFrame:
 
 NEWS_API_KEY = os.getenv("NEWS_API_KEY", "")
 NEWS_API_URL = "https://newsapi.org/v2/everything"
+
+# NewsAPI free tier only serves the last ~30 days. Set True whenever a caller
+# requests a longer window than we can actually deliver, so the UI can warn.
+NEWS_TRUNCATED = False
 
 
 def fetch_price_history(ticker: str, period: str = "3mo") -> pd.DataFrame:
@@ -73,6 +77,14 @@ def fetch_news_headlines(ticker: str, days_back: int = 30) -> list[dict]:
     if not NEWS_API_KEY:
         return []
 
+    # Free tier caps the lookback at 30 days; clip and flag if more was asked for.
+    global NEWS_TRUNCATED
+    if days_back > 30:
+        NEWS_TRUNCATED = True
+        days_back = 30
+    else:
+        NEWS_TRUNCATED = False
+
     # Look up the company name for a smarter search query
     company_name = get_company_name(ticker)
     
@@ -80,7 +92,7 @@ def fetch_news_headlines(ticker: str, days_back: int = 30) -> list[dict]:
     bare_ticker = ticker.replace(".NS", "").replace(".BO", "")
     query = f'"{company_name}" OR "{bare_ticker}"'
 
-    from_date = (datetime.utcnow() - timedelta(days=days_back)).strftime("%Y-%m-%d")
+    from_date = (datetime.now(timezone.utc) - timedelta(days=days_back)).strftime("%Y-%m-%d")
     params = {
         "q": query,
         "from": from_date,
@@ -92,7 +104,9 @@ def fetch_news_headlines(ticker: str, days_back: int = 30) -> list[dict]:
 
     try:
         response = requests.get(NEWS_API_URL, params=params, timeout=10)
-        response.raise_for_status()
+        if response.status_code != 200:
+            print(f"NewsAPI error {response.status_code}: {response.text[:200]}")
+            return []
         articles = response.json().get("articles", [])
         return [
             {
@@ -109,15 +123,32 @@ def fetch_news_headlines(ticker: str, days_back: int = 30) -> list[dict]:
         return []
 
 
-def get_ticker_info(ticker: str, price_df: pd.DataFrame = None) -> dict:
+def get_yf_enrichment(ticker: str) -> dict:
+    """
+    Previously pulled the slow/rate-limited yf.Ticker(...).info call. That call
+    was the main source of yfinance rate-limit stalls, so as of Phase 1 we no
+    longer make it: industry/market cap are dropped and price comes solely from
+    the already-fetched price_df. Kept as a stable no-op so the cached wrapper
+    and call sites in app.py don't need to change.
+    """
+    return {"industry": "N/A", "market_cap": None, "fallback_price": None}
+
+
+def get_ticker_info(
+    ticker: str,
+    price_df: pd.DataFrame = None,
+    enrichment: dict = None,
+) -> dict:
     """
     Return basic company info for display.
-    Uses CSV lookup for name + sector, history data for current price.
-    Falls back to yf.info only as a last resort.
+
+    Reads name + sector from the local Nifty 50 CSV (instant, no network),
+    current price from the already-fetched price_df, and industry / market cap
+    from the optional `enrichment` dict (which the caller is responsible for
+    caching — see app.cached_yf_enrichment).
     """
-    # Get company name + sector from CSV (instant, no API call)
     company_name = get_company_name(ticker)
-    
+
     sector = "N/A"
     try:
         df = pd.read_csv(_NIFTY50_CSV)
@@ -126,25 +157,17 @@ def get_ticker_info(ticker: str, price_df: pd.DataFrame = None) -> dict:
             sector = match.iloc[0]["sector"]
     except Exception:
         pass
-    
-    # Get current price from the price_df we already fetched (no extra API call!)
+
     current_price = None
     if price_df is not None and not price_df.empty:
         current_price = float(price_df["Close"].iloc[-1])
-    
-    # Try yf.info ONLY for industry (optional enrichment)
-    industry = "N/A"
-    market_cap = None
-    try:
-        info = yf.Ticker(ticker).info
-        industry = info.get("industry", "N/A")
-        market_cap = info.get("marketCap")
-        # If we still don't have current price, try info as backup
-        if current_price is None:
-            current_price = info.get("currentPrice") or info.get("regularMarketPrice")
-    except Exception:
-        pass  # Fail silently — we already have the essential data
-    
+
+    enrichment = enrichment or {}
+    industry = enrichment.get("industry", "N/A")
+    market_cap = enrichment.get("market_cap")
+    if current_price is None:
+        current_price = enrichment.get("fallback_price")
+
     return {
         "name": company_name,
         "sector": sector,

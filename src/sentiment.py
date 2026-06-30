@@ -40,13 +40,27 @@ def score_articles(articles: list[dict]) -> pd.DataFrame:
     return df.sort_values("date", ascending=False).reset_index(drop=True)
 
 
-def daily_sentiment(scored_df: pd.DataFrame) -> pd.DataFrame:
+def daily_sentiment(scored_df: pd.DataFrame, trading_days=None) -> pd.DataFrame:
     """
     Aggregate per-article scores into a daily average compound score.
     Returns DataFrame with columns: date, avg_compound, article_count.
+
+    If `trading_days` is provided (typically the trading-day DatetimeIndex from
+    yfinance), the result is reindexed against it so news-free days appear as
+    rows with NaN avg_compound and zero article_count. This keeps sentiment bars
+    on the chart aligned with the candlesticks.
     """
+    empty_cols = ["date", "avg_compound", "article_count"]
+
     if scored_df.empty:
-        return pd.DataFrame(columns=["date", "avg_compound", "article_count"])
+        if trading_days is not None:
+            normalized = pd.to_datetime(trading_days).tz_localize(None).normalize()
+            return pd.DataFrame({
+                "date": normalized,
+                "avg_compound": float("nan"),
+                "article_count": 0,
+            })
+        return pd.DataFrame(columns=empty_cols)
 
     agg = (
         scored_df.dropna(subset=["date"])
@@ -55,6 +69,19 @@ def daily_sentiment(scored_df: pd.DataFrame) -> pd.DataFrame:
         .reset_index()
         .sort_values("date")
     )
+
+    if trading_days is not None:
+        normalized = pd.to_datetime(trading_days).tz_localize(None).normalize().unique()
+        agg = (
+            agg.set_index("date")
+            .reindex(normalized)
+            .rename_axis("date")
+            .reset_index()
+        )
+        # Missing trading days stay NaN for avg_compound (chart shows a gap) but
+        # are explicitly zero-count.
+        agg["article_count"] = agg["article_count"].fillna(0).astype(int)
+
     return agg
 
 
