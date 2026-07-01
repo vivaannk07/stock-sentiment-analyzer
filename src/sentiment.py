@@ -100,12 +100,44 @@ def sentiment_summary(scored_df: pd.DataFrame) -> dict:
     }
 def classify_signal(avg_compound: float) -> dict:
     """
-    Convert an average compound score into a Buy/Hold/Sell signal with color.
-    Returns dict with 'signal', 'color', and 'emoji' keys.
+    Convert an average compound score into a Buy/Hold/Sell signal.
+    Returns dict with 'signal', 'color', 'emoji' and 'icon' keys.
+
+    Colours track the SENTRA palette (--buy / --hold / --sell); the thresholds
+    themselves are unchanged.
     """
     if avg_compound >= 0.2:
-        return {"signal": "BUY", "color": "#26a69a", "emoji": "🟢"}
+        return {"signal": "BUY", "color": "#34E0A1", "emoji": "🟢", "icon": "↑"}
     elif avg_compound <= -0.2:
-        return {"signal": "SELL", "color": "#ef5350", "emoji": "🔴"}
+        return {"signal": "SELL", "color": "#FF5C5C", "emoji": "🔴", "icon": "↓"}
     else:
-        return {"signal": "HOLD", "color": "#ffa726", "emoji": "🟡"}
+        return {"signal": "HOLD", "color": "#F4B740", "emoji": "🟡", "icon": "→"}
+
+
+def conviction_score(summary: dict) -> int:
+    """
+    Derive a 0–100 conviction score for the verdict gauge from a sentiment
+    summary (see `sentiment_summary`).
+
+    Two ingredients, weighted evenly-ish:
+      • strength  — how far the average compound is from neutral (capped at 0.5)
+      • agreement — share of articles that back the signal's direction
+    With no articles it returns 0. Because HOLD's dominant bucket is "neutral"
+    and its strength is low by construction, conviction stays deliberately
+    capped until news flow breaks one way — matching the reference behaviour.
+    """
+    total = summary.get("total", 0)
+    if total == 0:
+        return 0
+
+    avg = summary.get("avg_compound", 0.0)
+    if avg >= 0.2:
+        dominant = summary.get("positive", 0)
+    elif avg <= -0.2:
+        dominant = summary.get("negative", 0)
+    else:
+        dominant = summary.get("neutral", 0)
+
+    agreement = dominant / total
+    strength = min(1.0, abs(avg) / 0.5)
+    return int(round(100 * (0.55 * agreement + 0.45 * strength)))

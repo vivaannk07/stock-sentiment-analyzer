@@ -1,6 +1,7 @@
 import os
 import requests
 import pandas as pd
+import streamlit as st
 import yfinance as yf
 from datetime import datetime, timedelta, timezone
 from dotenv import load_dotenv
@@ -132,6 +133,54 @@ def get_yf_enrichment(ticker: str) -> dict:
     and call sites in app.py don't need to change.
     """
     return {"industry": "N/A", "market_cap": None, "fallback_price": None}
+
+
+@st.cache_data(ttl=86400, show_spinner=False)  # 24h — fundamentals barely move intraday
+def fetch_market_stats(ticker: str) -> dict:
+    """
+    Slow-moving fundamentals for the KPI row: market cap, trailing P/E,
+    52-week range and latest volume.
+
+    This is the one place we still hit the rate-limited yf.Ticker(...).info
+    endpoint (get_yf_enrichment is a deliberate no-op — see above), so the whole
+    thing is wrapped in try/except and every field defaults to "N/A". A failed or
+    throttled call therefore degrades gracefully instead of crashing the view.
+    The 24h TTL keeps us off that endpoint on repeat views of the same ticker.
+    """
+    stats = {
+        "market_cap": "N/A",
+        "pe_ratio": "N/A",
+        "week52_low": "N/A",
+        "week52_high": "N/A",
+        "volume": "N/A",
+    }
+    try:
+        info = yf.Ticker(ticker).info or {}
+
+        market_cap = info.get("marketCap")
+        if market_cap:
+            stats["market_cap"] = int(market_cap)
+
+        pe = info.get("trailingPE") or info.get("forwardPE")
+        if pe:
+            stats["pe_ratio"] = round(float(pe), 2)
+
+        low = info.get("fiftyTwoWeekLow")
+        high = info.get("fiftyTwoWeekHigh")
+        if low:
+            stats["week52_low"] = float(low)
+        if high:
+            stats["week52_high"] = float(high)
+
+        volume = info.get("volume") or info.get("regularMarketVolume") or info.get("averageVolume")
+        if volume:
+            stats["volume"] = int(volume)
+    except Exception as e:
+        # Network error, rate limit, or a missing/renamed field — keep the "N/A"
+        # defaults so the KPI row still renders.
+        print(f"Market stats fetch failed for {ticker}: {e}")
+
+    return stats
 
 
 def get_ticker_info(

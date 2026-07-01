@@ -1,0 +1,14 @@
+# SENTRA design system — dark terminal theme.
+# Palette + fonts mirror design-reference/"SENTRA Terminal.html". Component-level
+# styling (pills, cards, gauge, header) lives in assets/style.css, which app.py
+# injects at startup — Streamlit's [theme] block only covers the coarse tokens.
+[theme]
+base = "dark"
+primaryColor = "#34E0A1"              # --buy (accent / interactive)
+backgroundColor = "#08090B"           # --bg  (page)
+secondaryBackgroundColor = "#0F1013"  # --s1  (sidebar / cards)
+textColor = "#ECEDEF"                 # --tx  (primary text)
+font = "sans serif"
+
+[server]
+headless = true
